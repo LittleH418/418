@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>会计科目汇总系统</title>
+
+<style>
+
+body{
+    font-family:"Microsoft YaHei";
+    background:#f5f6fa;
+    padding:20px;
+}
+
+h1{
+    text-align:center;
+    margin-bottom:20px;
+}
+
+.box{
+    background:white;
+    padding:20px;
+    border-radius:12px;
+    box-shadow:0 2px 10px rgba(0,0,0,0.08);
+    margin-bottom:20px;
+}
+
+input,button{
+    padding:10px;
+    border-radius:8px;
+    border:1px solid #ccc;
+    margin:5px;
+    font-size:15px;
+}
+
+button{
+    background:#2b7cff;
+    color:white;
+    border:none;
+    cursor:pointer;
+}
+
+button:hover{
+    background:#1565d8;
+}
+
+/* 修改/编辑按钮的样式 */
+.btn-edit {
+    background: #ff9f43;
+    padding: 5px 10px;
+    font-size: 13px;
+    border-radius: 4px;
+}
+.btn-edit:hover {
+    background: #ee5253;
+}
+
+/* 新增的清空按钮样式 */
+.btn-clear {
+    background: #ee5253;
+    float: right;
+    margin-top: -5px;
+}
+.btn-clear:hover {
+    background: #c0392b;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+    background:white;
+}
+
+th,td{
+    border:1px solid #ddd;
+    padding:10px;
+    text-align:center;
+}
+
+th{
+    background:#2b7cff;
+    color:white;
+}
+
+.total{
+    margin-top:20px;
+    font-size:18px;
+    font-weight:bold;
+}
+
+.clearfix::after {
+    content: "";
+    clear: both;
+    display: table;
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>会计科目汇总系统</h1>
+
+<div class="box">
+
+    <input type="text" id="code" placeholder="输入科目编号 如1001">
+
+    <input type="text" id="subject" placeholder="自动显示科目" readonly>
+
+    <input type="number" id="debit" placeholder="借方金额">
+
+    <input type="number" id="credit" placeholder="贷方金额">
+
+    <button onclick="addRecord()">添加业务</button>
+
+</div>
+
+<div class="box">
+
+    <div class="clearfix">
+        <h2 style="display:inline-block; margin:0;">业务记录</h2>
+        <!-- 新增清空数据按钮 -->
+        <button class="btn-clear" onclick="clearAllRecords()">清空所有数据</button>
+    </div>
+
+    <table style="margin-top:15px;">
+
+        <thead>
+            <tr>
+                <th>序号</th>
+                <th>科目编号</th>
+                <th>会计科目</th>
+                <th>借方</th>
+                <th>贷方</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+
+        <tbody id="recordBody"></tbody>
+
+    </table>
+
+</div>
+
+<div class="box">
+
+    <h2>科目汇总</h2>
+
+    <table>
+
+        <thead>
+            <tr>
+                <th>科目编号</th>
+                <th>会计科目</th>
+                <th>借方合计</th>
+                <th>贷方合计</th>
+            </tr>
+        </thead>
+
+        <tbody id="summaryBody"></tbody>
+
+    </table>
+
+    <div class="total" id="grandTotal">
+        总借方：0.00 ｜ 总贷方：0.00
+    </div>
+
+</div>
+
+<script>
+
+const subjects = {
+
+"1001":"库存现金",
+"1002":"银行存款",
+"1012":"其他货币资金",
+"1101":"交易性金融资产",
+"1121":"应收票据",
+"1122":"应收账款",
+"1123":"预付账款",
+"1132":"应收利息",
+"1221":"其他应收款",
+"1231":"坏账准备",
+"1401":"材料采购",
+"1403":"原材料",
+"1404":"材料成本差异",
+"1405":"库存商品",
+"1406":"发出商品",
+"1411":"周转材料",
+"1501":"债权投资",
+"1503":"其他权益工具投资",
+"1511":"长期股权投资",
+"1601":"固定资产",
+"1602":"累计折旧",
+"1604":"在建工程",
+"1606":"固定资产清理",
+"1701":"无形资产",
+"1702":"累计摊销",
+"1811":"递延所得税资产",
+"1901":"待处理财产损溢",
+"2001":"短期借款",
+"2201":"应付票据",
+"2202":"应付账款",
+"2211":"应付职工薪酬",
+"2221":"应交税费",
+"2231":"应付利息",
+"2232":"应付股利",
+"2241":"其他应付款",
+"2501":"长期借款",
+"2801":"预计负债",
+"2901":"递延所得税负债",
+"4001":"实收资本",
+"4004":"其他综合收益",
+"4101":"盈余公积",
+"4103":"本年利润",
+"4104":"利润分配",
+"5001":"生产成本",
+"5101":"制造费用",
+"6001":"主营业务收入",
+"6101":"其他业务收入",
+"6111":"投资收益",
+"6301":"营业外收入",
+"6401":"主营业务成本",
+"6403":"税金及附加",
+"6601":"销售费用",
+"6602":"管理费用",
+"6603":"财务费用",
+"6701":"资产减值损失",
+"6711":"营业外支出",
+"6801":"所得税费用",
+"6115":"资产处置损益",
+"6901":"以前年度损益调整"
+
+};
+
+// 【修改点 1】初始化时，尝试从 localStorage 读取已保存的数据，若没有则为空数组
+let records = JSON.parse(localStorage.getItem("accounting_records")) || [];
+
+document.getElementById("code").addEventListener("input",function(){
+
+    let code = this.value.trim();
+
+    document.getElementById("subject").value = subjects[code] || "";
+
+});
+
+// 【新增点 2】封装一个统一保存并更新页面的函数，减少重复代码
+function saveAndRefresh() {
+    localStorage.setItem("accounting_records", JSON.stringify(records));
+    renderRecords();
+    renderSummary();
+}
+
+function addRecord(){
+
+    let code = document.getElementById("code").value.trim();
+
+    let subject = subjects[code];
+
+    let debit = parseFloat(document.getElementById("debit").value) || 0;
+
+    let credit = parseFloat(document.getElementById("credit").value) || 0;
+
+    if(!subject){
+        alert("科目编号不存在！");
+        return;
+    }
+
+    if(debit === 0 && credit === 0){
+        alert("借方和贷方不能同时为 0 ！");
+        return;
+    }
+
+    records.push({
+        code,
+        subject,
+        debit,
+        credit
+    });
+
+    // 【修改点 3】添加完后调用保存与刷新
+    saveAndRefresh();
+
+    document.getElementById("code").value = "";
+    document.getElementById("subject").value = "";
+    document.getElementById("debit").value = "";
+    document.getElementById("credit").value = "";
+}
+
+function renderRecords(){
+
+    let body = document.getElementById("recordBody");
+
+    body.innerHTML = "";
+
+    records.forEach((r,index)=>{
+
+        body.innerHTML += `
+            <tr>
+                <td>${index+1}</td>
+                <td>${r.code}</td>
+                <td>${r.subject}</td>
+                <td>${r.debit.toFixed(2)}</td>
+                <td>${r.credit.toFixed(2)}</td>
+                <td><button class="btn-edit" onclick="editRecord(${index})">修改</button></td>
+            </tr>
+        `;
+    });
+}
+
+function editRecord(index) {
+    let item = records[index];
+    
+    document.getElementById("code").value = item.code;
+    document.getElementById("subject").value = item.subject;
+    document.getElementById("debit").value = item.debit === 0 ? "" : item.debit;
+    document.getElementById("credit").value = item.credit === 0 ? "" : item.credit;
+    
+    records.splice(index, 1);
+    
+    // 【修改点 4】点击修改（即提取出数据并从列表中移除）后，同步更新缓存
+    saveAndRefresh();
+}
+
+// 【新增点 5】清空所有数据的函数
+function clearAllRecords() {
+    if(records.length === 0) {
+        alert("当前没有可清空的数据！");
+        return;
+    }
+    if(confirm("确定要清空所有的业务记录和汇总吗？此操作不可恢复！")) {
+        records = [];
+        saveAndRefresh();
+    }
+}
+
+function renderSummary(){
+
+    let summary = {};
+
+    for(let code in subjects){
+
+        summary[code] = {
+            subject:subjects[code],
+            debit:0,
+            credit:0
+        };
+    }
+
+    records.forEach(r=>{
+        // 容错处理：防止缓存中存在旧的、但现在被删掉的科目编号导致报错
+        if(summary[r.code]) {
+            summary[r.code].debit += r.debit;
+            summary[r.code].credit += r.credit;
+        }
+    });
+
+    let body = document.getElementById("summaryBody");
+
+    body.innerHTML = "";
+
+    let totalDebit = 0;
+    let totalCredit = 0;
+
+    for(let code in summary){
+        
+        if (summary[code].debit > 0 || summary[code].credit > 0) {
+            body.innerHTML += `
+                <tr>
+                    <td>${code}</td>
+                    <td>${summary[code].subject}</td>
+                    <td>${summary[code].debit.toFixed(2)}</td>
+                    <td>${summary[code].credit.toFixed(2)}</td>
+                </tr>
+            `;
+        }
+
+        totalDebit += summary[code].debit;
+
+        totalCredit += summary[code].credit;
+    }
+
+    document.getElementById("grandTotal").innerHTML =
+    `总借方：${totalDebit.toFixed(2)} ｜ 总贷方：${totalCredit.toFixed(2)}`;
+
+}
+
+// 【修改点 6】页面首次加载时，除了汇总，也要把缓存中的历史记录渲染出来
+renderRecords();
+renderSummary();
+
+</script>
+
+</body>
+</html>
